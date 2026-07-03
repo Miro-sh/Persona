@@ -5,6 +5,9 @@ build/
 # Fabric Loom dev run directory
 run/
 
+# Claude Code
+.claude/
+
 # IDE
 .idea/
 *.iml
