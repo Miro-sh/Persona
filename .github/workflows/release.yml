@@ -11,6 +11,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,34 +30,44 @@ jobs:
       - name: Build
         run: ./gradlew build
 
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Persona ${{ github.ref_name }}
-          files: build/libs/persona-*.jar
-          generate_release_notes: true
-          body: |
-            **Persona ${{ github.ref_name }}** is a client side Fabric mod that locally changes your
-            Minecraft name, skin and cape, or fully impersonates another player. Everything is a
-            local illusion: only you see it.
+      - name: Write release notes
+        run: |
+          VERSION="${TAG#v}"
+          cat > notes.md <<'EOF'
+          **Persona** is a client side Fabric mod that locally changes your Minecraft name, skin
+          and cape, or fully impersonates another player. Everything is a local illusion: only you
+          see it.
 
-            ## Requirements
-            - Minecraft **1.21.11**
-            - [Fabric Loader](https://fabricmc.net/use/installer/)
-            - [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11
+          ## Requirements
+          - Minecraft **1.21.11**
+          - [Fabric Loader](https://fabricmc.net/use/installer/)
+          - [Fabric API](https://modrinth.com/mod/fabric-api) for 1.21.11
+          - Optional: [Flashback](https://modrinth.com/mod/flashback) for the replay-editor integration
 
-            ## Install
-            1. Download `persona-*.jar` below.
-            2. Put it, together with Fabric API, into your `.minecraft/mods` folder.
-            3. Launch the game and press **Right Shift** to open the menu.
+          ## Install
+          1. Download `persona-__VERSION__.jar` below.
+          2. Put it, together with Fabric API, into your `.minecraft/mods` folder.
+          3. Launch the game and press **Right Shift** to open the menu.
 
-            ## Highlights
-            - Two modes: **Custom** (name, skin and cape separately) and **Impersonate** (take a
-              player's whole identity in one field).
-            - Name override on nametag, tab list and chat.
-            - Searchable list of 36 bundled official capes.
-            - Live rotatable 3D preview.
+          ## Highlights
+          - Two modes: **Custom** (name, skin and cape separately) and **Impersonate** (take a
+            player's whole identity in one field).
+          - Skin copied by **username or UUID**.
+          - Name override on nametag, tab list and chat.
+          - Searchable list of 36 bundled official capes.
+          - Live rotatable 3D preview.
+          - **Flashback integration** (optional): per-entity Persona cape and a robust
+            skin-&-cape-from-UUID control in the replay editor's entity popup.
 
-            > Local only. Other players never see your Persona look; the server owns that data.
+          > Local only. Other players never see your Persona look; the server owns that data.
 
-            See the [README](https://github.com/Miro-sh/Persona#readme) for full details.
+          See the [README](https://github.com/Miro-sh/Persona#readme) for full details.
+          EOF
+          sed -i "s/__VERSION__/${VERSION}/g" notes.md
+
+      - name: Publish or update release
+        run: |
+          gh release create "$TAG" build/libs/persona-*.jar \
+            --title "Persona $TAG" --notes-file notes.md || true
+          gh release edit "$TAG" --title "Persona $TAG" --notes-file notes.md
+          gh release upload "$TAG" build/libs/persona-*.jar --clobber

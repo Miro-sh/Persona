@@ -115,8 +115,8 @@ public class PersonaScreen extends Screen {
         y += 44;
         skinLabelY = y;
         skinField = new TextFieldWidget(this.textRenderer, leftX, y + 10, leftW, 18, Text.literal("Skin"));
-        skinField.setMaxLength(16);
-        skinField.setPlaceholder(Text.literal("Player name..."));
+        skinField.setMaxLength(36);
+        skinField.setPlaceholder(Text.literal("Player name or UUID..."));
         skinField.setText(skinText);
         addDrawableChild(skinField);
 
@@ -217,7 +217,7 @@ public class PersonaScreen extends Screen {
             sectionLabel(ctx, "NAME", leftX, nameLabelY);
             hint(ctx, "head, tab, chat", leftX + 48, nameLabelY);
             sectionLabel(ctx, "SKIN", leftX, skinLabelY);
-            hint(ctx, "copy a player's skin", leftX + 42, skinLabelY);
+            hint(ctx, "name or UUID (+ their cape)", leftX + 42, skinLabelY);
             sectionLabel(ctx, "CAPE", leftX, capeLabelY);
         } else {
             sectionLabel(ctx, "IMPERSONATE A PLAYER", leftX, impLabelY);

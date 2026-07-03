@@ -29,7 +29,7 @@ Open the menu with **Right Shift** and pick one of two modes.
 Set each piece of your look on its own:
 
 * **Name** shown on your nametag, in the tab list and in chat.
-* **Skin** copied from any player by username (correct slim or classic model).
+* **Skin** copied from any player by **username or UUID** (correct slim or classic model).
 * **Cape** chosen from a searchable list of every official Minecraft cape.
 
 ### Impersonate
@@ -41,6 +41,20 @@ admire the cape.
 > **Local only.** Persona changes your own client render only. Other players on a server never see
 > your Persona name, skin or cape, because the server owns that data. This is by design.
 
+## Flashback integration
+
+Persona optionally hooks into the [Flashback](https://modrinth.com/mod/flashback) replay mod. When
+Flashback is installed, right-clicking an entity in the replay editor adds a **Persona** section to
+its popup where you can, per entity:
+
+* pick a **Persona cape** from the full bundled cape list, and
+* set a **skin & cape from a UUID or name** — a more forgiving replacement for Flashback's native
+  field, which only accepts a perfectly dashed UUID.
+
+Both overrides persist to disk and re-apply every frame, so a Persona cape stays on even after you
+load a custom skin from a file in Flashback. Flashback is only *recommended*, never required:
+Persona builds and runs fine without it.
+
 <!-- Add a screenshot of the menu here, for example:
 ![Persona menu](docs/menu.png)
 -->
@@ -49,11 +63,12 @@ admire the cape.
 
 * Two modes: Custom and Impersonate.
 * Name override on nametag, tab list and chat.
-* Skin fetched from the Mojang API by username.
+* Skin fetched from the Mojang API by username **or UUID**.
 * 36 bundled real official cape textures, with a search box.
 * Live rotatable 3D preview.
+* Optional **Flashback** integration: per-entity cape and skin/cape-from-UUID in the replay editor.
 * Clean custom themed interface.
-* Settings saved to `config/persona.json`.
+* Settings saved to `config/persona.json` (Flashback overrides to `config/persona/`).
 * Remappable open key (default Right Shift).
 
 ## Install
@@ -98,9 +113,15 @@ All overrides are local render hooks applied with mixins:
 | Tab list | `PlayerListHud#getPlayerName` |
 | Chat | `ChatHud#addMessage` |
 | Skin and cape | `AbstractClientPlayerEntity#getSkin` |
+| Flashback popup | `SelectedEntityPopup#render` (string-targeted, conditional mixin) |
 
 Skins and impersonated capes come from the vanilla `PlayerSkinProvider`, which downloads the skin
 and reads the cape from the player's Mojang profile.
+
+The Flashback hooks are string-targeted mixins gated by a `MixinConfigPlugin`, so they only apply
+when Flashback is present. The `getSkin` override uses MixinExtras `@WrapMethod` to wrap the whole
+method as the outermost layer, so Persona's cape survives even when Flashback cancels `getSkin` to
+inject a file-based skin.
 
 ## License
 

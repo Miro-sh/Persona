@@ -2,12 +2,15 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.persona.mixin",
+  "plugin": "com.persona.flashback.PersonaMixinConfigPlugin",
   "compatibilityLevel": "JAVA_21",
   "client": [
     "AbstractClientPlayerEntityMixin",
     "EntityRendererMixin",
     "PlayerListHudMixin",
-    "ChatHudMixin"
+    "ChatHudMixin",
+    "flashback.SelectedEntityPopupCapeMixin",
+    "flashback.AbstractClientPlayerEntityCapeMixin"
   ],
   "injectors": {
     "defaultRequire": 1

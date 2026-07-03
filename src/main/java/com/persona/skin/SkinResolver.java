@@ -33,12 +33,24 @@ public final class SkinResolver {
 
     private SkinResolver() {}
 
-    public static CompletableFuture<Optional<SkinTextures>> resolve(String username) {
-        if (username == null || username.isBlank()) {
+    /**
+     * Resolve a skin (and the player's own cape) from either a username or a raw UUID.
+     *
+     * <p>A UUID may be dashed ({@code 069a79f4-44e9-4726-a5be-fca90e38aaf5}) or undashed
+     * (32 hex chars). When a UUID is given the username lookup is skipped and the
+     * sessionserver profile — which carries both the SKIN and CAPE textures — is fetched
+     * directly.</p>
+     */
+    public static CompletableFuture<Optional<SkinTextures>> resolve(String source) {
+        if (source == null || source.isBlank()) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
+        String trimmed = source.trim();
         return CompletableFuture
-                .supplyAsync(() -> fetchProfile(username.trim()))
+                .supplyAsync(() -> {
+                    UUID uuid = tryParseUuid(trimmed);
+                    return uuid != null ? fetchProfileByUuid(uuid) : fetchProfileByName(trimmed);
+                })
                 .thenCompose(profileOpt -> {
                     MinecraftClient mc = MinecraftClient.getInstance();
                     // Skin provider only exists once the client is fully constructed;
@@ -49,13 +61,13 @@ public final class SkinResolver {
                     return mc.getSkinProvider().fetchSkinTextures(profileOpt.get());
                 })
                 .exceptionally(t -> {
-                    PersonaClient.LOGGER.warn("[Persona] Skin resolution failed for '{}': {}", username, t.toString());
+                    PersonaClient.LOGGER.warn("[Persona] Skin resolution failed for '{}': {}", trimmed, t.toString());
                     return Optional.empty();
                 });
     }
 
     /** username -> UUID -> GameProfile with the "textures" property populated. */
-    private static Optional<GameProfile> fetchProfile(String username) {
+    private static Optional<GameProfile> fetchProfileByName(String username) {
         try {
             String idJson = get(PROFILE_BY_NAME + username);
             if (idJson == null) {
@@ -64,32 +76,65 @@ public final class SkinResolver {
             JsonObject idObj = JsonParser.parseString(idJson).getAsJsonObject();
             String undashed = idObj.get("id").getAsString();
             String name = idObj.has("name") ? idObj.get("name").getAsString() : username;
-            UUID uuid = dashUuid(undashed);
-
-            String profJson = get(SESSION_PROFILE + undashed + "?unsigned=false");
-            if (profJson == null) {
-                return Optional.empty();
-            }
-            JsonObject profObj = JsonParser.parseString(profJson).getAsJsonObject();
-
-            // GameProfile(uuid, name) uses the shared immutable PropertyMap.EMPTY, so we
-            // must build a mutable map and pass it via the 3-arg constructor.
-            Multimap<String, Property> mm = LinkedHashMultimap.create();
-            if (profObj.has("properties")) {
-                profObj.getAsJsonArray("properties").forEach(el -> {
-                    JsonObject p = el.getAsJsonObject();
-                    String pname = p.get("name").getAsString();
-                    String value = p.get("value").getAsString();
-                    String signature = p.has("signature") ? p.get("signature").getAsString() : null;
-                    mm.put(pname,
-                            signature != null ? new Property(pname, value, signature) : new Property(pname, value));
-                });
-            }
-            return Optional.of(new GameProfile(uuid, name, new PropertyMap(mm)));
+            return fetchProfile(dashUuid(undashed), undashed, name);
         } catch (Exception e) {
             PersonaClient.LOGGER.warn("[Persona] Could not fetch profile for '{}': {}", username, e.toString());
             return Optional.empty();
         }
+    }
+
+    /** UUID -> GameProfile with the "textures" property populated (skin + cape). */
+    private static Optional<GameProfile> fetchProfileByUuid(UUID uuid) {
+        String undashed = uuid.toString().replace("-", "");
+        try {
+            return fetchProfile(uuid, undashed, undashed);
+        } catch (Exception e) {
+            PersonaClient.LOGGER.warn("[Persona] Could not fetch profile for UUID '{}': {}", uuid, e.toString());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Fetch the signed sessionserver profile and turn it into a {@link GameProfile}.
+     * {@code fallbackName} is used when the profile response omits a name.
+     */
+    private static Optional<GameProfile> fetchProfile(UUID uuid, String undashed, String fallbackName) throws Exception {
+        String profJson = get(SESSION_PROFILE + undashed + "?unsigned=false");
+        if (profJson == null) {
+            return Optional.empty();
+        }
+        JsonObject profObj = JsonParser.parseString(profJson).getAsJsonObject();
+        String name = profObj.has("name") ? profObj.get("name").getAsString() : fallbackName;
+
+        // GameProfile(uuid, name) uses the shared immutable PropertyMap.EMPTY, so we
+        // must build a mutable map and pass it via the 3-arg constructor.
+        Multimap<String, Property> mm = LinkedHashMultimap.create();
+        if (profObj.has("properties")) {
+            profObj.getAsJsonArray("properties").forEach(el -> {
+                JsonObject p = el.getAsJsonObject();
+                String pname = p.get("name").getAsString();
+                String value = p.get("value").getAsString();
+                String signature = p.has("signature") ? p.get("signature").getAsString() : null;
+                mm.put(pname,
+                        signature != null ? new Property(pname, value, signature) : new Property(pname, value));
+            });
+        }
+        return Optional.of(new GameProfile(uuid, name, new PropertyMap(mm)));
+    }
+
+    /** Returns the parsed UUID if {@code s} is a dashed or undashed UUID, else null. */
+    private static UUID tryParseUuid(String s) {
+        try {
+            if (s.length() == 36 && s.indexOf('-') == 8) {
+                return UUID.fromString(s);
+            }
+            if (s.length() == 32 && s.matches("\\p{XDigit}{32}")) {
+                return dashUuid(s);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // not a valid UUID; fall through to name resolution
+        }
+        return null;
     }
 
     private static String get(String url) throws Exception {

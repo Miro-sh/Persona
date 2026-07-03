@@ -1,11 +1,13 @@
 package com.persona;
 
+import com.persona.flashback.FlashbackCapeIntegration;
 import com.persona.gui.PersonaScreen;
 import com.persona.identity.IdentityManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
@@ -49,6 +51,11 @@ public class PersonaClient implements ClientModInitializer {
                 }
             }
         });
+
+        if (FabricLoader.getInstance().isModLoaded("flashback")) {
+            FlashbackCapeIntegration.init();
+            LOGGER.info("[Persona] Flashback integration initialized.");
+        }
 
         LOGGER.info("[Persona] initialised. Press Right Shift to open.");
     }
